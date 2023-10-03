@@ -33,7 +33,7 @@ from ldm.models.diffusion.ddpm import LatentDepth2ImageDiffusion
 
 from einops import repeat, rearrange
 from blendmodes.blend import blendLayers, BlendType
-
+from hyper_tile import split_attention
 
 # some of those options should not be changed at all because they would break the model, so I removed them from options.
 opt_C = 4
@@ -1134,26 +1134,27 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
                 self.extra_generation_params["Hires upscaler"] = self.hr_upscaler
 
     def sample(self, conditioning, unconditional_conditioning, seeds, subseeds, subseed_strength, prompts):
-        self.sampler = sd_samplers.create_sampler(self.sampler_name, self.sd_model)
-
-        x = self.rng.next()
-        samples = self.sampler.sample(self, x, conditioning, unconditional_conditioning, image_conditioning=self.txt2img_image_conditioning(x))
-        del x
-
-        if not self.enable_hr:
-            return samples
-
-        if self.latent_scale_mode is None:
-            decoded_samples = torch.stack(decode_latent_batch(self.sd_model, samples, target_device=devices.cpu, check_for_nans=True)).to(dtype=torch.float32)
-        else:
-            decoded_samples = None
-
-        with sd_models.SkipWritingToConfig():
-            sd_models.reload_model_weights(info=self.hr_checkpoint_info)
-
-        devices.torch_gc()
-
-        return self.sample_hr_pass(samples, decoded_samples, seeds, subseeds, subseed_strength, prompts)
+        with split_attention(self.sd_model.model, self.height, self.width, tile_size=256, swap_size=2):
+            self.sampler = sd_samplers.create_sampler(self.sampler_name, self.sd_model)
+    
+            x = self.rng.next()
+            samples = self.sampler.sample(self, x, conditioning, unconditional_conditioning, image_conditioning=self.txt2img_image_conditioning(x))
+            del x
+    
+            if not self.enable_hr:
+                return samples
+    
+            if self.latent_scale_mode is None:
+                decoded_samples = torch.stack(decode_latent_batch(self.sd_model, samples, target_device=devices.cpu, check_for_nans=True)).to(dtype=torch.float32)
+            else:
+                decoded_samples = None
+    
+            with sd_models.SkipWritingToConfig():
+                sd_models.reload_model_weights(info=self.hr_checkpoint_info)
+    
+            devices.torch_gc()
+    
+            return self.sample_hr_pass(samples, decoded_samples, seeds, subseeds, subseed_strength, prompts)
 
     def sample_hr_pass(self, samples, decoded_samples, seeds, subseeds, subseed_strength, prompts):
         if shared.state.interrupted:
@@ -1519,21 +1520,22 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
         self.image_conditioning = self.img2img_image_conditioning(image * 2 - 1, self.init_latent, image_mask)
 
     def sample(self, conditioning, unconditional_conditioning, seeds, subseeds, subseed_strength, prompts):
-        x = self.rng.next()
-
-        if self.initial_noise_multiplier != 1.0:
-            self.extra_generation_params["Noise multiplier"] = self.initial_noise_multiplier
-            x *= self.initial_noise_multiplier
-
-        samples = self.sampler.sample_img2img(self, self.init_latent, x, conditioning, unconditional_conditioning, image_conditioning=self.image_conditioning)
-
-        if self.mask is not None:
-            samples = samples * self.nmask + self.init_latent * self.mask
-
-        del x
-        devices.torch_gc()
-
-        return samples
+        with split_attention(self.sd_model.model, self.height, self.width, tile_size=256, swap_size=2):
+            x = self.rng.next()
+    
+            if self.initial_noise_multiplier != 1.0:
+                self.extra_generation_params["Noise multiplier"] = self.initial_noise_multiplier
+                x *= self.initial_noise_multiplier
+    
+            samples = self.sampler.sample_img2img(self, self.init_latent, x, conditioning, unconditional_conditioning, image_conditioning=self.image_conditioning)
+    
+            if self.mask is not None:
+                samples = samples * self.nmask + self.init_latent * self.mask
+    
+            del x
+            devices.torch_gc()
+    
+            return samples
 
     def get_token_merging_ratio(self, for_hr=False):
         return self.token_merging_ratio or ("token_merging_ratio" in self.override_settings and opts.token_merging_ratio) or opts.token_merging_ratio_img2img or opts.token_merging_ratio
