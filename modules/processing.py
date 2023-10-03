@@ -1134,7 +1134,7 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
                 self.extra_generation_params["Hires upscaler"] = self.hr_upscaler
 
     def sample(self, conditioning, unconditional_conditioning, seeds, subseeds, subseed_strength, prompts):
-        with split_attention(self.sd_model.model, self.height, self.width, tile_size=256, swap_size=2):
+        with split_attention(self.sd_model.model, self.height, self.width, tile_size=256, swap_size=2, min_tile_size=256):
             self.sampler = sd_samplers.create_sampler(self.sampler_name, self.sd_model)
     
             x = self.rng.next()
@@ -1520,7 +1520,7 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
         self.image_conditioning = self.img2img_image_conditioning(image * 2 - 1, self.init_latent, image_mask)
 
     def sample(self, conditioning, unconditional_conditioning, seeds, subseeds, subseed_strength, prompts):
-        with split_attention(self.sd_model.model, self.height, self.width, tile_size=256, swap_size=2):
+        with split_attention(self.sd_model.model, self.height, self.width, tile_size=256, swap_size=2, min_tile_size=256):
             x = self.rng.next()
     
             if self.initial_noise_multiplier != 1.0:
