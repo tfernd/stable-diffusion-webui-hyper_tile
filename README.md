@@ -1,3 +1,25 @@
+# HyperTile Hack
+
+This is a quick hack so people can play with HyperTile (https://github.com/tfernd/HyperTile).
+
+Go to your webui folder and type:
+```bash
+git remote add hyper_tile https://github.com/tfernd/stable-diffusion-webui-hyper_tile
+git fetch hyper_tile
+git checkout -b hyper_tile  hyper_tile/master
+```
+
+This will change your branch to this testing one. If you want to go back, just:
+
+```
+git checkout master # Go to Automatic1111 version
+# git checkout hyper_tile # Test Hyper-Tile again.
+```
+
+For now, I hacked a tile of 256 and 2 swaps. You may have to restart and checkout the two branches to compare for now.
+
+
+
 # Stable Diffusion web UI
 A browser interface based on Gradio library for Stable Diffusion.
 
