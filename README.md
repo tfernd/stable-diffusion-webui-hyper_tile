@@ -7,6 +7,9 @@ Go to your webui folder and type:
 git remote add hyper_tile https://github.com/tfernd/stable-diffusion-webui-hyper_tile
 git fetch hyper_tile
 git checkout -b hyper_tile  hyper_tile/master
+
+.\venv\Scripts\activate
+pip install -U git+https://github.com/tfernd/HyperTile
 ```
 
 This will change your branch to this testing one. If you want to go back, just:
